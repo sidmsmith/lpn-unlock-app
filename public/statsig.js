@@ -86,23 +86,20 @@ function logEvent(eventName, eventValue = {}, user = null) {
   }
 
   try {
-    // Create user object if not provided
-    const userObject = user || {
-      userID: getUserId(),
-      custom: {
-        org: getCurrentOrg(),
-        timestamp: new Date().toISOString()
+    // New @statsig/js-client SDK API: logEvent(eventName, value, metadata)
+    // value can be string or number, metadata is Record<string, string>
+    // User is set during initialization, so we don't pass it here
+    
+    // Convert eventValue object to metadata (string values only for metadata)
+    const metadata = {};
+    if (eventValue && typeof eventValue === 'object') {
+      for (const [key, value] of Object.entries(eventValue)) {
+        metadata[key] = String(value);
       }
-    };
-
-    // New SDK uses logEvent method directly, old SDK uses logEvent(user, event, value)
-    if (typeof statsigClient.logEvent === 'function') {
-      // New @statsig/js-client SDK
-      statsigClient.logEvent(eventName, eventValue);
-    } else if (typeof statsigClient.logEvent === 'function' && statsigClient.logEvent.length === 3) {
-      // Legacy SDK
-      statsigClient.logEvent(userObject, eventName, eventValue);
     }
+    
+    // New SDK: logEvent(eventName, value?, metadata?)
+    statsigClient.logEvent(eventName, null, metadata);
     console.log(`[Statsig] Event logged: ${eventName}`, eventValue);
   } catch (error) {
     console.error(`[Statsig] Error logging event "${eventName}":`, error);
@@ -117,19 +114,9 @@ async function checkGate(gateName, user = null) {
   }
 
   try {
-    // New SDK - user is set during initialization, just pass gate name
-    if (typeof statsigClient.checkGate === 'function' && statsigClient.checkGate.length === 1) {
-      return statsigClient.checkGate(gateName);
-    } else {
-      // Legacy SDK - needs user object
-      const userObject = user || {
-        userID: getUserId(),
-        custom: {
-          org: getCurrentOrg()
-        }
-      };
-      return statsigClient.checkGate(userObject, gateName);
-    }
+    // New @statsig/js-client SDK: checkGate(name, options?)
+    // User is set during initialization, so we just pass the gate name
+    return statsigClient.checkGate(gateName);
   } catch (error) {
     console.error(`[Statsig] Error checking gate "${gateName}":`, error);
     return false;
@@ -144,19 +131,9 @@ async function getExperiment(experimentName, user = null) {
   }
 
   try {
-    // New SDK - user is set during initialization, just pass experiment name
-    if (typeof statsigClient.getExperiment === 'function' && statsigClient.getExperiment.length === 1) {
-      return statsigClient.getExperiment(experimentName);
-    } else {
-      // Legacy SDK - needs user object
-      const userObject = user || {
-        userID: getUserId(),
-        custom: {
-          org: getCurrentOrg()
-        }
-      };
-      return statsigClient.getExperiment(userObject, experimentName);
-    }
+    // New @statsig/js-client SDK: getExperiment(name, options?)
+    // User is set during initialization, so we just pass the experiment name
+    return statsigClient.getExperiment(experimentName);
   } catch (error) {
     console.error(`[Statsig] Error getting experiment "${experimentName}":`, error);
     return null;
