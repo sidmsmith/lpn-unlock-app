@@ -51,11 +51,22 @@ async function initStatsig() {
   
   try {
     // Check if Statsig SDK is available (loaded via CDN)
-    if (typeof Statsig !== 'undefined') {
+    // The new @statsig/js-client exposes StatsigClient, not Statsig
+    if (typeof StatsigClient !== 'undefined') {
+      const user = { userID: getUserId() };
+      statsigClient = new StatsigClient(STATSIG_CLIENT_KEY, user);
+      await statsigClient.initializeAsync();
+      statsigInitialized = true;
+      console.log('[Statsig] Initialized successfully');
+      
+      // Track app opened event
+      logEvent('app_opened', {});
+    } else if (typeof Statsig !== 'undefined') {
+      // Fallback for old SDK if it exists
       await Statsig.initialize(STATSIG_CLIENT_KEY);
       statsigClient = Statsig;
       statsigInitialized = true;
-      console.log('[Statsig] Initialized successfully');
+      console.log('[Statsig] Initialized successfully (legacy SDK)');
       
       // Track app opened event
       logEvent('app_opened', {});
@@ -84,7 +95,14 @@ function logEvent(eventName, eventValue = {}, user = null) {
       }
     };
 
-    statsigClient.logEvent(userObject, eventName, eventValue);
+    // New SDK uses logEvent method directly, old SDK uses logEvent(user, event, value)
+    if (typeof statsigClient.logEvent === 'function') {
+      // New @statsig/js-client SDK
+      statsigClient.logEvent(eventName, eventValue);
+    } else if (typeof statsigClient.logEvent === 'function' && statsigClient.logEvent.length === 3) {
+      // Legacy SDK
+      statsigClient.logEvent(userObject, eventName, eventValue);
+    }
     console.log(`[Statsig] Event logged: ${eventName}`, eventValue);
   } catch (error) {
     console.error(`[Statsig] Error logging event "${eventName}":`, error);
@@ -99,14 +117,19 @@ async function checkGate(gateName, user = null) {
   }
 
   try {
-    const userObject = user || {
-      userID: getUserId(),
-      custom: {
-        org: getCurrentOrg()
-      }
-    };
-
-    return statsigClient.checkGate(userObject, gateName);
+    // New SDK - user is set during initialization, just pass gate name
+    if (typeof statsigClient.checkGate === 'function' && statsigClient.checkGate.length === 1) {
+      return statsigClient.checkGate(gateName);
+    } else {
+      // Legacy SDK - needs user object
+      const userObject = user || {
+        userID: getUserId(),
+        custom: {
+          org: getCurrentOrg()
+        }
+      };
+      return statsigClient.checkGate(userObject, gateName);
+    }
   } catch (error) {
     console.error(`[Statsig] Error checking gate "${gateName}":`, error);
     return false;
@@ -121,14 +144,19 @@ async function getExperiment(experimentName, user = null) {
   }
 
   try {
-    const userObject = user || {
-      userID: getUserId(),
-      custom: {
-        org: getCurrentOrg()
-      }
-    };
-
-    return statsigClient.getExperiment(userObject, experimentName);
+    // New SDK - user is set during initialization, just pass experiment name
+    if (typeof statsigClient.getExperiment === 'function' && statsigClient.getExperiment.length === 1) {
+      return statsigClient.getExperiment(experimentName);
+    } else {
+      // Legacy SDK - needs user object
+      const userObject = user || {
+        userID: getUserId(),
+        custom: {
+          org: getCurrentOrg()
+        }
+      };
+      return statsigClient.getExperiment(userObject, experimentName);
+    }
   } catch (error) {
     console.error(`[Statsig] Error getting experiment "${experimentName}":`, error);
     return null;
@@ -164,36 +192,40 @@ if (document.readyState === 'loading') {
 
 // Load Statsig SDK from CDN
 function loadStatsigSDK() {
-  // Check if already loaded
-  if (typeof Statsig !== 'undefined') {
+  // Check if already loaded (check for both new and old SDK)
+  if (typeof StatsigClient !== 'undefined' || typeof Statsig !== 'undefined') {
     initStatsig();
     return;
   }
 
-  // Try multiple CDN sources for Statsig SDK
-  const cdnSources = [
-    'https://cdn.jsdelivr.net/npm/statsig-js@latest/dist/statsig.min.js',
-    'https://unpkg.com/statsig-js@latest/dist/statsig.min.js'
+  // Try multiple sources for Statsig SDK
+  // Using the new @statsig/js-client package (statsig-js is deprecated)
+  // First try local file, then CDN
+  const sources = [
+    '/statsig-js-client.min.js',  // Local file (copied from node_modules)
+    'https://cdn.jsdelivr.net/npm/@statsig/js-client@latest/build/statsig-js-client.min.js',
+    'https://unpkg.com/@statsig/js-client@latest/build/statsig-js-client.min.js'
   ];
 
   let currentSource = 0;
 
   function tryLoadSource() {
-    if (currentSource >= cdnSources.length) {
-      console.error('[Statsig] Failed to load SDK from all CDN sources');
-      console.warn('[Statsig] You may need to install statsig-js via npm and bundle it, or use a different CDN');
+    if (currentSource >= sources.length) {
+      console.error('[Statsig] Failed to load SDK from all sources');
+      console.warn('[Statsig] Make sure @statsig/js-client is installed via npm');
       return;
     }
 
     const script = document.createElement('script');
-    script.src = cdnSources[currentSource];
+    script.src = sources[currentSource];
     script.async = true;
     script.onload = () => {
-      console.log(`[Statsig] SDK loaded from CDN: ${cdnSources[currentSource]}`);
+      const sourceName = sources[currentSource].startsWith('/') ? 'local file' : 'CDN';
+      console.log(`[Statsig] SDK loaded from ${sourceName}: ${sources[currentSource]}`);
       initStatsig();
     };
     script.onerror = () => {
-      console.warn(`[Statsig] Failed to load from ${cdnSources[currentSource]}, trying next source...`);
+      console.warn(`[Statsig] Failed to load from ${sources[currentSource]}, trying next source...`);
       currentSource++;
       tryLoadSource();
     };
