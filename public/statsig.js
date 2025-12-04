@@ -50,28 +50,30 @@ async function initStatsig() {
   }
   
   try {
-    // Check if Statsig SDK is available (loaded via CDN)
-    // The new @statsig/js-client exposes StatsigClient, not Statsig
-    if (typeof StatsigClient !== 'undefined') {
+    // Check if Statsig SDK is available
+    // The new @statsig/js-client exposes Statsig.StatsigClient
+    if (typeof Statsig !== 'undefined' && typeof Statsig.StatsigClient !== 'undefined') {
       const user = { userID: getUserId() };
-      statsigClient = new StatsigClient(STATSIG_CLIENT_KEY, user);
+      statsigClient = new Statsig.StatsigClient(STATSIG_CLIENT_KEY, user);
       await statsigClient.initializeAsync();
       statsigInitialized = true;
       console.log('[Statsig] Initialized successfully');
       
       // Track app opened event
       logEvent('app_opened', {});
-    } else if (typeof Statsig !== 'undefined') {
-      // Fallback for old SDK if it exists
-      await Statsig.initialize(STATSIG_CLIENT_KEY);
-      statsigClient = Statsig;
+    } else if (typeof StatsigClient !== 'undefined') {
+      // Fallback: direct StatsigClient global (if exposed differently)
+      const user = { userID: getUserId() };
+      statsigClient = new StatsigClient(STATSIG_CLIENT_KEY, user);
+      await statsigClient.initializeAsync();
       statsigInitialized = true;
-      console.log('[Statsig] Initialized successfully (legacy SDK)');
+      console.log('[Statsig] Initialized successfully (direct StatsigClient)');
       
       // Track app opened event
       logEvent('app_opened', {});
     } else {
       console.warn('[Statsig] SDK not loaded. Make sure to include Statsig SDK script in HTML.');
+      console.warn('[Statsig] Available globals:', Object.keys(window).filter(k => k.toLowerCase().includes('statsig')));
     }
   } catch (error) {
     console.error('[Statsig] Initialization error:', error);
@@ -169,8 +171,8 @@ if (document.readyState === 'loading') {
 
 // Load Statsig SDK from CDN
 function loadStatsigSDK() {
-  // Check if already loaded (check for both new and old SDK)
-  if (typeof StatsigClient !== 'undefined' || typeof Statsig !== 'undefined') {
+  // Check if already loaded
+  if (typeof Statsig !== 'undefined' || typeof StatsigClient !== 'undefined') {
     initStatsig();
     return;
   }
