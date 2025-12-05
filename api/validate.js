@@ -50,6 +50,31 @@ async function apiCall(method, path, token, org, body = null) {
   return res.ok ? await res.json() : { error: await res.text() };
 }
 
+// Home Assistant webhook helper
+const HA_WEBHOOK_URL = "http://sidmsmith.zapto.org:8123/api/webhook/manhattan_app_usage";
+
+async function sendHAMessage(payload) {
+  try {
+    // Use AbortController for timeout in Node.js
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    
+    await fetch(HA_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+  } catch (error) {
+    // Silently fail - don't interrupt user experience
+    if (error.name !== 'AbortError') {
+      console.warn('[HA] Failed to send webhook:', error.message);
+    }
+  }
+}
+
 // Export handler
 export default async function handler(req, res) {
   console.log(`[API] ${req.method} ${req.url}`);
@@ -63,6 +88,26 @@ export default async function handler(req, res) {
 
   // === APP OPENED (NO ORG) ===
   if (action === 'app_opened') {
+    // Track app opened event
+    sendHAMessage({
+      event_name: 'app_opened',
+      app_name: 'lpn-unlock-app',
+      app_version: '2.4.0',
+      timestamp: new Date().toISOString()
+    });
+    return res.json({ success: true });
+  }
+
+  // === HA TRACK EVENT ===
+  if (action === 'ha-track') {
+    const { event_name, metadata } = req.body;
+    sendHAMessage({
+      event_name,
+      app_name: 'lpn-unlock-app',
+      app_version: '2.4.0',
+      ...metadata,
+      timestamp: new Date().toISOString()
+    });
     return res.json({ success: true });
   }
 
