@@ -88,26 +88,24 @@ export default async function handler(req, res) {
 
   // === APP OPENED (NO ORG) ===
   if (action === 'app_opened') {
-    // Track app opened event
-    sendHAMessage({
-      event_name: 'app_opened',
-      app_name: 'lpn-unlock-app',
-      app_version: '2.4.0',
-      timestamp: new Date().toISOString()
-    });
+    // Track app opened event (metadata will be added by frontend)
     return res.json({ success: true });
   }
 
   // === HA TRACK EVENT ===
   if (action === 'ha-track') {
     const { event_name, metadata } = req.body;
-    sendHAMessage({
+    
+    // Build complete payload with app info and timestamp
+    const payload = {
       event_name,
       app_name: 'lpn-unlock-app',
       app_version: '2.4.0',
       ...metadata,
       timestamp: new Date().toISOString()
-    });
+    };
+    
+    sendHAMessage(payload);
     return res.json({ success: true });
   }
 
