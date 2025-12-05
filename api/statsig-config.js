@@ -1,13 +1,11 @@
 // api/statsig-config.js
-import { VercelRequest, VercelResponse } from '@vercel/node';
-
-export default function (req, res) {
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (req.method === 'OPTIONS') {
-    return res.status(200).send('OK');
+    return res.status(200).end();
   }
 
   const clientKey = process.env.STATSIG_CLIENT_KEY;
@@ -19,5 +17,5 @@ export default function (req, res) {
     });
   }
 
-  res.status(200).json({ key: clientKey });
+  return res.status(200).json({ key: clientKey });
 }
