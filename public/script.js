@@ -174,6 +174,13 @@ if (themeSelectorBtn) {
 
 // === APP OPENED ON PAGE LOAD ===
 window.addEventListener('load', async () => {
+  // Track app opened in Statsig
+  if (window.StatsigTracking && window.StatsigTracking.isInitialized()) {
+    window.StatsigTracking.logEvent('app_opened', {
+      timestamp: new Date().toISOString()
+    });
+  }
+  
   await fetch('/api/validate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -194,15 +201,43 @@ async function authenticate() {
     mainUI.style.display = 'none';
     return;
   }
+  
+  // Track auth attempt in Statsig
+  if (window.StatsigTracking && window.StatsigTracking.isInitialized()) {
+    window.StatsigTracking.logEvent('auth_attempt', {
+      org: org || 'unknown',
+      timestamp: new Date().toISOString()
+    });
+  }
+  
   status('Authenticating...');
   const res = await api('auth', { org });
   if (!res.success) {
+    // Track auth failure in Statsig
+    if (window.StatsigTracking && window.StatsigTracking.isInitialized()) {
+      window.StatsigTracking.logEvent('auth_failed', {
+        org: org || 'unknown',
+        error: res.error || 'Auth failed',
+        timestamp: new Date().toISOString()
+      });
+    }
+    
     status(res.error || 'Auth failed', 'error');
     mainUI.style.display = 'none';
     return;
   }
+  
   token = res.token;
   status('Authenticated!', 'success');
+  
+  // Track auth success in Statsig
+  if (window.StatsigTracking && window.StatsigTracking.isInitialized()) {
+    window.StatsigTracking.logEvent('auth_success', {
+      org: org,
+      timestamp: new Date().toISOString()
+    });
+  }
+  
   mainUI.style.display = 'block';
   await loadCodes(org);
   
@@ -246,8 +281,30 @@ async function runAction(action) {
   if (!lpn) return status('Enter LPN(s)', 'error');
   if (action === 'lock' && !code) return status('Select code to lock', 'error');
 
+  // Track lock/unlock attempt in Statsig
+  if (window.StatsigTracking && window.StatsigTracking.isInitialized()) {
+    window.StatsigTracking.logEvent(`${action}_attempt`, {
+      org: org || 'unknown',
+      lpn_count: String(lpn.split(/[\s,;]+/).filter(Boolean).length),
+      code: code || 'N/A',
+      timestamp: new Date().toISOString()
+    });
+  }
+
   status('Working...');
   const res = await api(action, { org, lpn, code });
   respEl.textContent = JSON.stringify(res.results || res, null, 2);
+  
+  // Track lock/unlock completion in Statsig
+  if (window.StatsigTracking && window.StatsigTracking.isInitialized()) {
+    window.StatsigTracking.logEvent(`${action}_completed`, {
+      org: org || 'unknown',
+      success_count: String(res.success || 0),
+      fail_count: String(res.fail || 0),
+      total: String(res.total || 0),
+      timestamp: new Date().toISOString()
+    });
+  }
+  
   status(`Done – ${res.success} success, ${res.fail} failed`, res.success > 0 ? 'success' : 'error');
 }

@@ -1,36 +1,12 @@
 // api/validate.js
 import fetch from 'node-fetch';
 
-const HA_WEBHOOK_URL = "http://sidmsmith.zapto.org:8123/api/webhook/manhattan_lpnlock";
 const AUTH_HOST = "salep-auth.sce.manh.com";
 const API_HOST = "salep.sce.manh.com";
 const CLIENT_ID = "omnicomponent.1.0.0";
 const CLIENT_SECRET = "b4s8rgTyg55XYNun";
 const PASSWORD = "Blu3sk!es2300";
 const USERNAME_BASE = "sdtadmin@";
-
-// Helper: send to HA
-async function sendHA(action, org, success = 0, fail = 0, total = 0) {
-  console.log(`[HA] Sending: ${action} | Org: ${org}`);
-  try {
-    const payload = {
-      type: "lpn_action",
-      action,
-      org: org || "unknown",
-      success_count: success,
-      fail_count: fail,
-      total_count: total
-    };
-    const response = await fetch(HA_WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    console.log(`[HA] Status: ${response.status}`);
-  } catch (e) {
-    console.error("[HA] ERROR:", e.message);
-  }
-}
 
 // Get OAuth token
 async function getToken(org) {
@@ -87,7 +63,6 @@ export default async function handler(req, res) {
 
   // === APP OPENED (NO ORG) ===
   if (action === 'app_opened') {
-    await sendHA("app_opened", "unknown");
     return res.json({ success: true });
   }
 
@@ -95,10 +70,8 @@ export default async function handler(req, res) {
   if (action === 'auth') {
     const token = await getToken(org);
     if (!token) {
-      await sendHA("auth_failed", org);
       return res.json({ success: false, error: "Auth failed" });
     }
-    await sendHA("auth_success", org);  // ← FIXED
     return res.json({ success: true, token });
   }
 
@@ -209,7 +182,6 @@ export default async function handler(req, res) {
     }
   }
 
-  await sendHA(action, org, success, fail, lpns.length);
   res.json({ results, success, fail, total: lpns.length });
 }
 

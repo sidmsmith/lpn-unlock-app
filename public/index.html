@@ -219,5 +219,19 @@
   </div>
 
   <script src="script.js"></script>
+  <!-- Statsig Analytics -->
+  <script src="statsig.js"></script>
+  <!-- Vercel Analytics -->
+  <script>
+    (function() {
+      const script = document.createElement('script');
+      script.src = '/_vercel/insights/script.js';
+      script.defer = true;
+      script.onerror = function() {
+        console.warn('Vercel Analytics script failed to load. Make sure Analytics is enabled in Vercel dashboard and the app is redeployed.');
+      };
+      document.head.appendChild(script);
+    })();
+  </script>
 </body>
 </html>
