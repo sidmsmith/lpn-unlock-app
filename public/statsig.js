@@ -159,18 +159,12 @@ function getUserId() {
   return userId;
 }
 
-// Helper: Get current org from the form
-function getCurrentOrg() {
-  const orgInput = document.getElementById('org');
-  return orgInput ? orgInput.value.trim() : 'unknown';
-}
-
 // Helper: Get app name and version from page title
 function getAppInfo() {
   const title = document.title || '';
-  // Extract version from title like "LPN Lock / Unlock v2.4.1" or "Driver Pickup v1.0.4"
+  // Extract version from title like "LPN Lock / Unlock v2.4.0"
   const versionMatch = title.match(/v(\d+\.\d+\.\d+)/i);
-  const version = versionMatch ? versionMatch[1] : 'unknown';
+  const version = versionMatch ? versionMatch[1] : '2.4.0'; // Default from title
   // Extract app name (everything before "v" or just use title)
   const appNameMatch = title.match(/^(.+?)\s+v\d+/i);
   const appName = appNameMatch ? appNameMatch[1].trim() : (title.split(' v')[0] || 'LPN Lock / Unlock');
@@ -239,4 +233,3 @@ window.StatsigTracking = {
   getExperiment,
   isInitialized: () => statsigInitialized
 };
-

@@ -1,33 +1,23 @@
 // api/statsig-config.js
-// Endpoint to provide Statsig Client SDK Key to the client
-// This keeps the key server-side and injects it into the page
+import { VercelRequest, VercelResponse } from '@vercel/node';
 
-export default async function handler(req, res) {
-  // Set CORS headers
+export default function (req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET');
-  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method === 'OPTIONS') {
+    return res.status(200).send('OK');
   }
 
-  // Get Client SDK Key from environment variable
-  // Note: You need STATSIG_CLIENT_KEY (not STATSIG_SERVER_SECRET) for client-side
-  const clientKey = process.env.STATSIG_CLIENT_KEY || process.env.STATSIG_CLIENT_SDK_KEY || null;
+  const clientKey = process.env.STATSIG_CLIENT_KEY;
 
   if (!clientKey) {
-    return res.status(200).json({ 
-      key: null,
-      error: 'STATSIG_CLIENT_KEY environment variable not set. Please add it in Vercel project settings.',
-      note: 'You need a Client SDK Key (starts with "client-"), not a Server Secret (starts with "secret-")'
+    return res.status(500).json({
+      error: 'STATSIG_CLIENT_KEY environment variable not set.',
+      note: 'Please set this in your Vercel project settings. It should start with "client-".'
     });
   }
 
-  // Return the client key
-  return res.status(200).json({ 
-    key: clientKey,
-    note: 'Client SDK Key retrieved successfully'
-  });
+  res.status(200).json({ key: clientKey });
 }
-
