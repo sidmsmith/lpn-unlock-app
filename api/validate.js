@@ -1,6 +1,4 @@
 // api/validate.js
-import fetch from 'node-fetch';
-
 const AUTH_HOST = process.env.MANHATTAN_AUTH_HOST || "salep-auth.sce.manh.com";
 const API_HOST = process.env.MANHATTAN_API_HOST || "salep.sce.manh.com";
 const CLIENT_ID = process.env.MANHATTAN_CLIENT_ID || "omnicomponent.1.0.0";
@@ -50,28 +48,34 @@ async function apiCall(method, path, token, org, body = null) {
   return res.ok ? await res.json() : { error: await res.text() };
 }
 
-// Home Assistant webhook helper
-const HA_WEBHOOK_URL = "http://sidmsmith.zapto.org:8123/api/webhook/manhattan_app_usage";
-
-async function sendHAMessage(payload) {
+/** POST JSON to apps_dashboard /api/usage-ingest (no NEON_DATABASE_URL on this app). */
+async function forwardUsageToIngest(payload) {
+  const url = process.env.MANHATTAN_USAGE_INGEST_URL;
+  if (!url) {
+    console.warn('[usage] MANHATTAN_USAGE_INGEST_URL not set; event not forwarded');
+    return;
+  }
+  const headers = { 'Content-Type': 'application/json' };
+  const secret = process.env.MANHATTAN_USAGE_INGEST_SECRET;
+  if (secret) {
+    headers.Authorization = `Bearer ${secret}`;
+  }
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), 8000);
+  let res;
   try {
-    // Use AbortController for timeout in Node.js
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-    
-    await fetch(HA_WEBHOOK_URL, {
+    res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(payload),
-      signal: controller.signal
+      signal: controller.signal,
     });
-    
-    clearTimeout(timeoutId);
-  } catch (error) {
-    // Silently fail - don't interrupt user experience
-    if (error.name !== 'AbortError') {
-      console.warn('[HA] Failed to send webhook:', error.message);
-    }
+  } finally {
+    clearTimeout(t);
+  }
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`ingest ${res.status}: ${text.slice(0, 200)}`);
   }
 }
 
@@ -92,7 +96,7 @@ export default async function handler(req, res) {
     return res.json({ success: true });
   }
 
-  // === HA TRACK EVENT ===
+  // === USAGE TRACK (Neon app_usage_events) ===
   if (action === 'ha-track') {
     const { event_name, metadata } = req.body;
     
@@ -105,7 +109,11 @@ export default async function handler(req, res) {
       timestamp: new Date().toISOString()
     };
     
-    sendHAMessage(payload);
+    try {
+      await forwardUsageToIngest(payload);
+    } catch (err) {
+      console.warn('[usage] ingest failed:', err.message);
+    }
     return res.json({ success: true });
   }
 
