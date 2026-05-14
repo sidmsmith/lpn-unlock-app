@@ -104,7 +104,7 @@ export default async function handler(req, res) {
     const payload = {
       event_name,
       app_name: 'lpn-unlock-app',
-      app_version: '2.4.0',
+      app_version: '2.5.0',
       ...metadata,
       timestamp: new Date().toISOString()
     };
